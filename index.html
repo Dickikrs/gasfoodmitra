@@ -72,11 +72,11 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-const URL = "https://script.google.com/macros/s/AKfycbyyyuCfRicKNmqv14b9dMYjefj7hf0h-rb0G1zehEkEVJclQWLl75H2PzZvv8MvrJS9/exec"; // ganti ini
+const URL = "https://script.google.com/macros/s/AKfycbyyyuCfRicKNmqv14b9dMYjefj7hf0h-rb0G1zehEkEVJclQWLl75H2PzZvv8MvrJS9/exec"; // WAJIB GANTI
 
 let driver_id = "";
 
-// 🔥 CONFIG FIREBASE
+// 🔥 CONFIG FIREBASE (SUDAH SESUAI PUNYA KAMU)
 const firebaseConfig = {
   apiKey: "bebas",
   authDomain: "bebas",
@@ -89,6 +89,8 @@ firebase.initializeApp(firebaseConfig);
 
 // 🛵 DAFTAR DRIVER
 function daftar() {
+  console.log("Daftar driver diklik...");
+
   fetch(URL, {
     method: "POST",
     body: JSON.stringify({
@@ -100,10 +102,13 @@ function daftar() {
   })
   .then(res => res.json())
   .then(res => {
+    console.log("Response daftar:", res);
+
     driver_id = res.id_driver;
+
     alert("Driver terdaftar! ID: " + driver_id);
 
-    startTracking(); // 🔥 mulai tracking
+    startTracking(); // 🔥 WAJIB
     loadOrder();
   });
 }
@@ -154,25 +159,44 @@ function ambil(id_order) {
 }
 
 
-// 📍 TRACKING DRIVER (REALTIME)
+// 📍 TRACKING DRIVER (FIX + DEBUG)
 function startTracking() {
-  navigator.geolocation.watchPosition((pos) => {
-    if (!driver_id) return;
+  console.log("🔥 Tracking dimulai...");
 
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+  if (!navigator.geolocation) {
+    alert("Browser tidak support GPS");
+    return;
+  }
 
-    firebase.database().ref("drivers/" + driver_id).set({
-      lat: lat,
-      lng: lng,
-      status: "online",
-      update: Date.now()
-    });
+  navigator.geolocation.watchPosition(
+    function(pos) {
+      if (!driver_id) {
+        console.log("❌ Driver ID kosong!");
+        return;
+      }
 
-    console.log("Lokasi:", lat, lng);
-  }, (err) => {
-    alert("GPS tidak aktif!");
-  });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      console.log("📍 Lokasi:", lat, lng);
+
+      firebase.database().ref("drivers/" + driver_id).set({
+        lat: lat,
+        lng: lng,
+        status: "online",
+        update: Date.now()
+      });
+
+      console.log("✅ Terkirim ke Firebase");
+    },
+    function(err) {
+      console.log("❌ ERROR GPS:", err);
+      alert("GPS error / belum diizinkan");
+    },
+    {
+      enableHighAccuracy: true
+    }
+  );
 }
 
 
