@@ -5,55 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
-    body {
-      font-family: Arial;
-      background: #f5f5f5;
-      margin: 0;
-    }
-
-    header {
-      background: green;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      font-size: 20px;
-    }
-
-    .container {
-      padding: 10px;
-    }
-
-    .card {
-      background: white;
-      padding: 15px;
-      margin-bottom: 10px;
-      border-radius: 10px;
-    }
-
-    button {
-      background: green;
-      color: white;
-      border: none;
-      padding: 10px;
-      margin-top: 5px;
-      border-radius: 5px;
-      width: 100%;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-    }
-
-    #log {
-      background: black;
-      color: lime;
-      padding: 10px;
-      font-size: 12px;
-      height: 150px;
-      overflow: auto;
-    }
+    body { font-family: Arial; background: #f5f5f5; margin: 0; }
+    header { background: green; color: white; padding: 15px; text-align: center; font-size: 20px; }
+    .container { padding: 10px; }
+    .card { background: white; padding: 15px; margin-bottom: 10px; border-radius: 10px; }
+    button { background: green; color: white; border: none; padding: 10px; margin-top: 5px; border-radius: 5px; width: 100%; }
+    input { width: 100%; padding: 10px; margin-top: 5px; }
+    #log { background: black; color: lime; padding: 10px; font-size: 12px; height: 150px; overflow: auto; }
   </style>
 </head>
 
@@ -61,7 +19,6 @@
 
 <header>🛵 Driver App</header>
 
-<!-- 🔥 LOG DEBUG -->
 <div id="log">LOG:</div>
 
 <div class="container">
@@ -72,7 +29,7 @@
   <input type="text" id="kendaraan" placeholder="Motor / Mobil">
   <button onclick="daftar()">Daftar Driver</button>
 
-  <button onclick="testFirebase()">🔥 Test Firebase</button>
+  <button onclick="toggleTracking()">🟢 ON / 🔴 OFF Driver</button>
 
   <hr>
 
@@ -81,63 +38,101 @@
 
 </div>
 
-<!-- 🔥 FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-const URL = "https://script.google.com/macros/s/AKfycbyyyuCfRicKNmqv14b9dMYjefj7hf0h-rb0G1zehEkEVJclQWLl75H2PzZvv8MvrJS9/exec"; // WAJIB GANTI
+const URL = "https://script.google.com/macros/s/AKfycbyyyuCfRicKNmqv14b9dMYjefj7hf0h-rb0G1zehEkEVJclQWLl75H2PzZvv8MvrJS9/exec";
 
 let driver_id = "";
+let watchId = null;
+let isTracking = false;
+let lastLat = null;
+let lastLng = null;
 
-// 🔥 CONFIG FIREBASE (MINIMAL & AMAN)
-const firebaseConfig = {
+firebase.initializeApp({
   databaseURL: "https://gas-food-default-rtdb.asia-southeast1.firebasedatabase.app/"
-};
+});
 
-firebase.initializeApp(firebaseConfig);
-
-
-// 🔥 LOG FUNCTION
 function log(msg) {
   document.getElementById("log").innerHTML += "<br>" + msg;
 }
 
-
 // 🛵 DAFTAR DRIVER
 function daftar() {
-  log("📌 Klik daftar driver...");
-
   fetch(URL, {
     method: "POST",
     body: JSON.stringify({
       action: "daftarDriver",
-      nama: document.getElementById("nama").value,
-      no_hp: document.getElementById("hp").value,
-      kendaraan: document.getElementById("kendaraan").value
+      nama: nama.value,
+      no_hp: hp.value,
+      kendaraan: kendaraan.value
     })
   })
   .then(res => res.json())
   .then(res => {
-    log("✅ Response: " + JSON.stringify(res));
-
     driver_id = res.id_driver;
-
-    if (!driver_id) {
-      log("❌ ID driver tidak ada!");
-      return;
-    }
-
-    log("🆔 Driver ID: " + driver_id);
-
-    startTracking();
+    log("🆔 " + driver_id);
     loadOrder();
-  })
-  .catch(err => {
-    log("❌ ERROR FETCH: " + err);
   });
 }
 
+// 🔁 ON/OFF TRACKING
+function toggleTracking() {
+  if (!driver_id) {
+    alert("Daftar dulu!");
+    return;
+  }
+
+  if (!isTracking) {
+    startTracking();
+  } else {
+    stopTracking();
+  }
+}
+
+// ▶ START TRACKING
+function startTracking() {
+  log("🟢 Tracking ON");
+  isTracking = true;
+
+  watchId = navigator.geolocation.watchPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    // filter kalau terlalu dekat (hemat)
+    if (lastLat && Math.abs(lat - lastLat) < 0.0001) return;
+
+    lastLat = lat;
+    lastLng = lng;
+
+    firebase.database().ref("drivers/" + driver_id).update({
+      lat,
+      lng,
+      status: "online",
+      update: Date.now()
+    });
+
+    log("📍 " + lat + "," + lng);
+
+  }, err => {
+    log("❌ GPS: " + err.message);
+  }, {
+    enableHighAccuracy: true
+  });
+}
+
+// ⛔ STOP TRACKING
+function stopTracking() {
+  log("🔴 Tracking OFF");
+  isTracking = false;
+
+  navigator.geolocation.clearWatch(watchId);
+
+  firebase.database().ref("drivers/" + driver_id).update({
+    status: "offline"
+  });
+}
 
 // 📦 LOAD ORDER
 function loadOrder() {
@@ -146,9 +141,7 @@ function loadOrder() {
   .then(data => {
     let html = "";
 
-    if (data.length == 0) {
-      html = "Tidak ada order";
-    }
+    if (data.length == 0) html = "Tidak ada order";
 
     data.forEach(o => {
       html += `
@@ -161,10 +154,9 @@ function loadOrder() {
       `;
     });
 
-    document.getElementById("orders").innerHTML = html;
+    orders.innerHTML = html;
   });
 }
-
 
 // 🚚 AMBIL ORDER
 function ambil(id_order) {
@@ -172,70 +164,18 @@ function ambil(id_order) {
     method: "POST",
     body: JSON.stringify({
       action: "ambilOrder",
-      id_order: id_order,
+      id_order,
       id_driver: driver_id
     })
   })
-  .then(res => res.json())
-  .then(res => {
-    log("✅ Order diambil");
+  .then(() => {
+    log("✅ Ambil order");
     loadOrder();
   });
 }
 
-
-// 📍 TRACKING DRIVER
-function startTracking() {
-  log("🔥 Tracking dimulai...");
-
-  if (!navigator.geolocation) {
-    log("❌ GPS tidak support");
-    return;
-  }
-
-  navigator.geolocation.watchPosition(
-    function(pos) {
-      if (!driver_id) {
-        log("❌ Driver ID kosong");
-        return;
-      }
-
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      log("📍 Lokasi: " + lat + "," + lng);
-
-      firebase.database().ref("drivers/" + driver_id).set({
-        lat: lat,
-        lng: lng,
-        status: "online",
-        update: Date.now()
-      });
-
-      log("✅ Terkirim ke Firebase");
-    },
-    function(err) {
-      log("❌ ERROR GPS: " + err.message);
-    },
-    {
-      enableHighAccuracy: true
-    }
-  );
-}
-
-
-// 🔥 TEST FIREBASE
-function testFirebase() {
-  firebase.database().ref("test").set({
-    pesan: "berhasil dari hp"
-  });
-  log("🔥 Test kirim manual ke Firebase");
-}
-
-
-// 🔄 AUTO REFRESH ORDER
+// 🔄 AUTO REFRESH
 setInterval(loadOrder, 5000);
-
 </script>
 
 </body>
