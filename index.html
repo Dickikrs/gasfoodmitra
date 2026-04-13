@@ -45,12 +45,24 @@
       padding: 10px;
       margin-top: 5px;
     }
+
+    #log {
+      background: black;
+      color: lime;
+      padding: 10px;
+      font-size: 12px;
+      height: 150px;
+      overflow: auto;
+    }
   </style>
 </head>
 
 <body>
 
 <header>🛵 Driver App</header>
+
+<!-- 🔥 LOG DEBUG -->
+<div id="log">LOG:</div>
 
 <div class="container">
 
@@ -59,6 +71,8 @@
   <input type="text" id="hp" placeholder="No HP">
   <input type="text" id="kendaraan" placeholder="Motor / Mobil">
   <button onclick="daftar()">Daftar Driver</button>
+
+  <button onclick="testFirebase()">🔥 Test Firebase</button>
 
   <hr>
 
@@ -76,20 +90,23 @@ const URL = "https://script.google.com/macros/s/AKfycbyyyuCfRicKNmqv14b9dMYjefj7
 
 let driver_id = "";
 
-// 🔥 CONFIG FIREBASE (SUDAH SESUAI PUNYA KAMU)
+// 🔥 CONFIG FIREBASE (MINIMAL & AMAN)
 const firebaseConfig = {
-  apiKey: "bebas",
-  authDomain: "bebas",
-  databaseURL: "https://gas-food-default-rtdb.asia-southeast1.firebasedatabase.app/",
-  projectId: "bebas"
+  databaseURL: "https://gas-food-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 
 firebase.initializeApp(firebaseConfig);
 
 
+// 🔥 LOG FUNCTION
+function log(msg) {
+  document.getElementById("log").innerHTML += "<br>" + msg;
+}
+
+
 // 🛵 DAFTAR DRIVER
 function daftar() {
-  console.log("Daftar driver diklik...");
+  log("📌 Klik daftar driver...");
 
   fetch(URL, {
     method: "POST",
@@ -102,14 +119,22 @@ function daftar() {
   })
   .then(res => res.json())
   .then(res => {
-    console.log("Response daftar:", res);
+    log("✅ Response: " + JSON.stringify(res));
 
     driver_id = res.id_driver;
 
-    alert("Driver terdaftar! ID: " + driver_id);
+    if (!driver_id) {
+      log("❌ ID driver tidak ada!");
+      return;
+    }
 
-    startTracking(); // 🔥 WAJIB
+    log("🆔 Driver ID: " + driver_id);
+
+    startTracking();
     loadOrder();
+  })
+  .catch(err => {
+    log("❌ ERROR FETCH: " + err);
   });
 }
 
@@ -153,32 +178,32 @@ function ambil(id_order) {
   })
   .then(res => res.json())
   .then(res => {
-    alert("Order diambil!");
+    log("✅ Order diambil");
     loadOrder();
   });
 }
 
 
-// 📍 TRACKING DRIVER (FIX + DEBUG)
+// 📍 TRACKING DRIVER
 function startTracking() {
-  console.log("🔥 Tracking dimulai...");
+  log("🔥 Tracking dimulai...");
 
   if (!navigator.geolocation) {
-    alert("Browser tidak support GPS");
+    log("❌ GPS tidak support");
     return;
   }
 
   navigator.geolocation.watchPosition(
     function(pos) {
       if (!driver_id) {
-        console.log("❌ Driver ID kosong!");
+        log("❌ Driver ID kosong");
         return;
       }
 
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
-      console.log("📍 Lokasi:", lat, lng);
+      log("📍 Lokasi: " + lat + "," + lng);
 
       firebase.database().ref("drivers/" + driver_id).set({
         lat: lat,
@@ -187,16 +212,24 @@ function startTracking() {
         update: Date.now()
       });
 
-      console.log("✅ Terkirim ke Firebase");
+      log("✅ Terkirim ke Firebase");
     },
     function(err) {
-      console.log("❌ ERROR GPS:", err);
-      alert("GPS error / belum diizinkan");
+      log("❌ ERROR GPS: " + err.message);
     },
     {
       enableHighAccuracy: true
     }
   );
+}
+
+
+// 🔥 TEST FIREBASE
+function testFirebase() {
+  firebase.database().ref("test").set({
+    pesan: "berhasil dari hp"
+  });
+  log("🔥 Test kirim manual ke Firebase");
 }
 
 
